@@ -1,0 +1,179 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Loader2, AlertCircle, ExternalLink, RefreshCw, Scale } from 'lucide-react';
+
+const RAW_URL = "https://raw.githubusercontent.com/citecase/projectsci/main/2025.md";
+
+const App = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [caseCount, setCaseCount] = useState(0);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(RAW_URL, { cache: 'no-cache' });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch (${response.status}). Verify the repo is public.`);
+      }
+      const text = await response.text();
+      const lines = text.split('\n');
+      parseTable(lines);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const parseTable = (lines) => {
+    const cases = [];
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('|')) {
+        const columns = trimmed.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
+        if (
+          columns.length >= 4 && 
+          !columns[0].toLowerCase().includes('s.no') && 
+          !columns[0].includes('---')
+        ) {
+          const caseName = columns[3]; 
+          const lastCol = columns[columns.length - 1];
+          const linkMatch = lastCol.match(/\[(.*?)\]\((.*?)\)/);
+          const citation = linkMatch ? linkMatch[1] : lastCol;
+          const url = linkMatch ? linkMatch[2] : (lastCol.match(/(https?:\/\/[^\s]+)/)?.[0] || null);
+
+          if (caseName && citation) {
+            cases.push({
+              id: `case-${index}`,
+              sno: columns[0],
+              name: caseName,
+              citation: citation,
+              url: url
+            });
+          }
+        }
+      }
+    });
+    setData(cases);
+    setCaseCount(cases.length);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredResults = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return [];
+    return data.filter(c => 
+      c.name.toLowerCase().includes(term) || 
+      c.citation.toLowerCase().includes(term)
+    );
+  }, [searchTerm, data]);
+
+  return (
+    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased">
+      {/* Main Container */}
+      <main className="max-w-2xl mx-auto px-6 pt-24 pb-12 flex flex-col items-center">
+        
+        {/* CiteCase Logo */}
+        <div className="flex items-center mb-10 select-none scale-110">
+          <div className="bg-white border-2 border-black px-4 py-2 rounded-l-xl">
+            <span className="text-3xl font-black tracking-tighter text-black uppercase">Cite</span>
+          </div>
+          <div className="bg-black border-2 border-black px-4 py-2 rounded-r-xl">
+            <span className="text-3xl font-black tracking-tighter text-white uppercase">Case</span>
+          </div>
+        </div>
+
+        {/* Search Input Area */}
+        <div className="w-full relative mb-6 group">
+          <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+            <Search className={`w-5 h-5 transition-colors ${searchTerm ? 'text-black' : 'text-slate-300'}`} />
+          </div>
+          <input
+            type="text"
+            className="w-full pl-14 pr-14 py-5 bg-white border-2 border-slate-200 rounded-full shadow-xl shadow-slate-100/40 outline-none focus:border-black transition-all text-lg placeholder:text-slate-300"
+            placeholder="Search Petitioner vs Respondent or Citation..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            autoFocus
+          />
+          <button 
+            onClick={fetchData}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+            title="Refresh database"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {/* Cleaned Stats Display */}
+        <div className="mb-10 text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400 text-center">
+          {!loading && !error && (
+            <span>{caseCount} Supreme Court Judgments Indexed</span>
+          )}
+        </div>
+
+        {/* Results Container */}
+        <div className="w-full space-y-4">
+          {loading ? (
+            <div className="flex flex-col items-center py-12">
+              <Loader2 className="w-8 h-8 text-black animate-spin mb-3" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Syncing Database...</p>
+            </div>
+          ) : error ? (
+            <div className="p-6 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              <p className="text-red-700 text-sm font-medium">{error}</p>
+            </div>
+          ) : searchTerm !== "" && filteredResults.length > 0 ? (
+            <div className="space-y-3">
+              {filteredResults.map((item) => (
+                <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-black shadow-sm transition-all group">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Case #{item.sno}</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 leading-snug group-hover:text-black">{item.name}</h3>
+                      <div className="mt-3 flex items-center gap-2">
+                         <span className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                           {item.citation}
+                         </span>
+                      </div>
+                    </div>
+                    {item.url && (
+                      <a 
+                        href={item.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-xl font-bold text-xs transition-transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-black/5"
+                      >
+                        VIEW JUDGMENT <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : searchTerm !== "" ? (
+            <div className="text-center py-16">
+              <p className="text-sm font-medium text-slate-400 tracking-wide italic">No records found matching "{searchTerm}"</p>
+            </div>
+          ) : null}
+        </div>
+      </main>
+
+      {/* Persistent Branding */}
+      <footer className="fixed bottom-8 w-full text-center pointer-events-none opacity-40">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Project SCI • 2025</p>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
