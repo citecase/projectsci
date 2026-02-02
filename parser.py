@@ -9,39 +9,39 @@ def process_folder():
     if not os.path.exists(target_dir):
         return
 
-    # Pattern explanation:
-    # 1. \[(.*?)\] -> Captures the Case Name inside square brackets
-    # 2. \((.*?)\) -> Captures the URL inside parentheses
-    # 3. (202\d\s+INSC\s+\d+) -> Captures the Neutral Citation
-    case_pattern = r'\[(.*?)\]\((.*?)\).*?(202\d\s+INSC\s+\d+)'
+    # UPDATED REGEX:
+    # \[([\s\S]*?)\] -> Matches everything inside [], including newlines (Case Name)
+    # \((.*?)\)      -> Matches the URL inside ()
+    # .*?            -> Skips any filler text (like "Appellant", "Versus", etc.)
+    # (\d{4}\s+INSC\s+\d+) -> Matches the Citation
+    case_pattern = r'\[([\s\S]*?)\]\((.*?)\)[\s\S]*?(\d{4}\s+INSC\s+\d+)'
 
-    for filename in os.listdir(target_dir):
+    for filename in sorted(os.listdir(target_dir)):
         if filename.endswith('.md'):
             file_path = os.path.join(target_dir, filename)
             
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 
-                # findall finds every occurrence in the file
-                matches = re.findall(case_pattern, content, re.DOTALL)
-                
-                for match in matches:
-                    case_name = match[0].strip()
-                    url = match[1].strip()
-                    citation = match[2].strip()
+                # Using re.finditer with re.MULTILINE to catch complex names
+                for match in re.finditer(case_pattern, content, re.MULTILINE):
+                    # Clean up the case name (remove extra newlines or markdown bolding)
+                    raw_name = match.group(1).replace('\n', ' ').replace('**', '').strip()
+                    # Remove multiple spaces
+                    clean_name = " ".join(raw_name.split())
                     
                     all_cases.append({
-                        "case_name": case_name,
-                        "citation": citation,
-                        "link": url
+                        "case_name": clean_name,
+                        "link": match.group(2).strip(),
+                        "citation": match.group(3).strip()
                     })
 
-    # Save to all_cases.json
+    # Save to json/all_cases.json
     output_path = os.path.join(target_dir, 'all_cases.json')
     with open(output_path, 'w', encoding='utf-8') as out_f:
         json.dump(all_cases, out_f, indent=4)
     
-    print(f"Successfully extracted {len(all_cases)} cases with links.")
+    print(f"Extraction complete. Total rows: {len(all_cases)}")
 
 if __name__ == "__main__":
     process_folder()
