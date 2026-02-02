@@ -1,6 +1,6 @@
 # Supreme Court Judgments - PDF Repository
 
-**Last Sync:** 2026-02-02 13:13:54 IST
+**Last Sync:** 2026-02-02 15:45:03 IST
 
 Click the citations in the **Judgment** column to open official PDFs.
 
