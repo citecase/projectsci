@@ -184,7 +184,16 @@
             const term = searchInput.value.toLowerCase().trim();
             resultsContainer.innerHTML = '';
 
-            if (!term) return;
+            // Trigger search results only when a user types five or more characters
+            if (term.length < 5) {
+                if (term.length > 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="text-center py-12">
+                            <p class="text-xs font-bold text-slate-300 uppercase tracking-widest">Type at least 5 characters to search...</p>
+                        </div>`;
+                }
+                return;
+            }
 
             const filtered = caseData.filter(c => 
                 c.name.toLowerCase().includes(term) || 
