@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiteCase - Project SCI 2025</title>
+    <title>CiteCase - Project SCI 2021-2026</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
@@ -75,11 +75,17 @@
 
     <!-- Persistent Branding -->
     <footer class="fixed bottom-8 w-full text-center pointer-events-none opacity-40">
-        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Project SCI • 2025</p>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Project SCI • 2021-2026</p>
     </footer>
 
     <script>
-        const RAW_URL = "https://raw.githubusercontent.com/citecase/projectsci/main/2025.md";
+        const DATA_SOURCES = [
+            "https://raw.githubusercontent.com/citecase/projectsci/refs/heads/main/2021.md",
+            "https://raw.githubusercontent.com/citecase/projectsci/refs/heads/main/2024.md",
+            "https://raw.githubusercontent.com/citecase/projectsci/main/2025.md",
+            "https://raw.githubusercontent.com/citecase/projectsci/refs/heads/main/January2026.md"
+        ];
+        
         let caseData = [];
 
         const searchInput = document.getElementById('searchInput');
@@ -91,12 +97,30 @@
 
         async function fetchData() {
             setLoading(true);
+            caseData = []; // Clear existing data to prevent duplicates on refresh
+            
             try {
-                const response = await fetch(RAW_URL, { cache: 'no-cache' });
-                if (!response.ok) throw new Error(`Failed to fetch (${response.status})`);
-                const text = await response.text();
-                const lines = text.split('\n');
-                parseTable(lines);
+                for (const url of DATA_SOURCES) {
+                    try {
+                        const response = await fetch(url, { cache: 'no-cache' });
+                        if (!response.ok) {
+                            console.warn(`Failed to fetch source: ${url}`);
+                            continue;
+                        }
+                        const text = await response.text();
+                        const lines = text.split('\n');
+                        parseTable(lines);
+                    } catch (e) {
+                        console.error(`Error fetching ${url}:`, e);
+                    }
+                }
+                
+                if (caseData.length === 0) {
+                    throw new Error("No data found in sources.");
+                }
+
+                statsDisplay.innerText = `${caseData.length} Supreme Court Judgments Indexed`;
+                renderResults();
             } catch (err) {
                 showError(err.message);
             } finally {
@@ -116,11 +140,11 @@
         }
 
         function parseTable(lines) {
-            caseData = [];
-            lines.forEach((line, index) => {
+            lines.forEach((line) => {
                 const trimmed = line.trim();
                 if (trimmed.startsWith('|')) {
                     const columns = trimmed.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
+                    // Standard structure: S.No | ... | Case Name (4th col / Index 3) | ... | Citation & Link (Last col)
                     if (columns.length >= 4 && !columns[0].toLowerCase().includes('s.no') && !columns[0].includes('---')) {
                         const caseName = columns[3]; 
                         const lastCol = columns[columns.length - 1];
@@ -129,13 +153,16 @@
                         const url = linkMatch ? linkMatch[2] : (lastCol.match(/(https?:\/\/[^\s]+)/)?.[0] || null);
 
                         if (caseName && citation) {
-                            caseData.push({ sno: columns[0], name: caseName, citation, url });
+                            caseData.push({ 
+                                sno: columns[0], 
+                                name: caseName, 
+                                citation: citation, 
+                                url: url 
+                            });
                         }
                     }
                 }
             });
-            statsDisplay.innerText = `${caseData.length} Supreme Court Judgments Indexed`;
-            renderResults();
         }
 
         function showError(msg) {
